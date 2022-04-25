@@ -16,12 +16,6 @@ from unicodedata import name
 from config import Config
 from common import get_str_time, tprint
 
-node_id = 0
-def distribute_node_id():
-    id = node_id
-    node_id += 1
-    return id
-
 class IdMgr(object):
     def __init__(self) -> None:
         self._node_id = 0
