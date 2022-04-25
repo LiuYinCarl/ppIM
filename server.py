@@ -40,8 +40,8 @@ class Node():
         self.addr = addr
         self.close_flag = False
 
-        self.name = None # 用户名
-        self.room_id = None # 用户所在的房间
+        self.name = None # client user nick name
+        self.room_id = None # the room which node in
         self.recv_msg_list = []
         self.send_msg_list = []
 
@@ -63,7 +63,7 @@ class Node():
         logging.debug("user:{} room:{} recv:{}".format(self.name, self.room, msg))
 
 class Room(object):
-    """一个房间."""
+    """single chat room."""
     def __init__(self, id):
         self.room_id = id
         self.nodes = {}
@@ -145,7 +145,7 @@ class RoomMgr(object):
 class Server(object):
     def __init__(self) -> None:
         self.conf = Config()
-        self.node_map = {} # cli_sock:Node
+        self.node_map = {} # k:v = cli_sock:Node
         self.room_mgr = RoomMgr()
         self.id_mgr = IdMgr()
         self.svr_socket = socket.socket()

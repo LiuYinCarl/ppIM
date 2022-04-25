@@ -50,7 +50,7 @@ class Client(object):
 
     def start(self):
         try:
-            self.sockfd.connect(self.server_addr)
+            self.sockfd.connect(self.config.server_addr)
         except Exception as e:
             print("conn to serer failed. err:{}".format(e))
             self.sockfd.close()
