@@ -4,7 +4,6 @@
 #
 
 from cmath import log
-from msilib import init_database
 import os
 import logging
 import sys
@@ -12,7 +11,6 @@ import time
 import socket
 import selectors
 from threading import Thread
-from unicodedata import name
 from config import Config
 from common import get_str_time, tprint
 
@@ -138,7 +136,7 @@ class RoomMgr(object):
         ok = room.deal_join(node)
         if not ok:
             return False
-        self.node_room_map[node.]
+        self.node_room_map[node.node_id] = room
         return True
 
 
@@ -174,7 +172,7 @@ class Server(object):
 
     def init_svr_socket(self):
         self.svr_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.svr_socket.bind(self.conf.server_port)
+        self.svr_socket.bind((self.conf.server_ip, self.conf.server_port))
         self.svr_socket.listen(100)
         self.svr_socket.setblocking(False)
         self.sel.register(self.svr_socket, selectors.EVENT_READ, self.accept_cli)
@@ -198,6 +196,7 @@ class Server(object):
 
     def start(self):
         self.init_svr_socket()
+        logging.info("Server start.")
         while True:
             events = self.sel.select()
             for key, mask in events:

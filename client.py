@@ -4,14 +4,13 @@ import sys
 import signal
 import time
 import socket
-
 from config import Config
 
 
 def get_host_ip():
     try:
         s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8',80))
+        # s.connect(('8.8.8.8',80))
         ip=s.getsockname()[0]
     finally:
         s.close()
@@ -20,7 +19,7 @@ def get_host_ip():
 
 class Client(object):
     def __init__(self):
-      self.config = Config()
+      self.conf = Config()
       self.sockfd = socket.socket()
       self.local_ip = get_host_ip()
 
@@ -50,7 +49,7 @@ class Client(object):
 
     def start(self):
         try:
-            self.sockfd.connect(self.config.server_addr)
+            self.sockfd.connect((self.conf.server_ip, self.conf.server_port))
         except Exception as e:
             print("conn to serer failed. err:{}".format(e))
             self.sockfd.close()
