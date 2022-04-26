@@ -2,18 +2,12 @@
 # server 在 client 连接上来的时候用兑成加密算法发送随机密钥给客户端
 # 之后客户端和服务端使用随机密钥加密信息进行通信
 #
-
-from cmath import log
-import os
 import logging
-import sys
-import time
 import socket
 import selectors
-from threading import Thread
 from config import Config
-from common import get_str_time, tprint
 from network import NetPacketMgr
+from proto import PROTO
 
 
 class IdMgr(object):
@@ -39,29 +33,43 @@ class Node():
         self.socket = socket
         self.addr = addr
         self.close_flag = False
+        self.proto_map = {}
 
         self.name = None # client user nick name
         self.room_id = None # the room which node in
-        self.recv_msg_list = []
-        self.send_msg_list = []
         self.net_packet_mgr = NetPacketMgr()
 
-    def send(self, msg):
-        """send message to client."""
-        msg = msg.encode("utf8")
-        self.send_msg_list.append(msg)
-        logging.debug("user:{} room:{} send:{}".format(self.name, self.room, msg))
+        self._register_proto()
 
-    def recv(self, msg):
+    def send(self, proto):
+        """send message to client."""
+        self.net_packet_mgr.send_proto(proto)
+
+    def recv(self):
         """receive message from client."""
-        data = self.socket.recv(1024)
-        if not data:
-            self.close_flag = True
-            logging.info("client close.")
+        proto = self.net_packet_mgr.recv_proto()
+        return proto
+
+    def _dispatch(self, proto:dict) -> None:
+        proto_id = proto["id"]
+        if proto_id not in self.proto_map:
+            logging.error("unknown proto_id({})".format(proto_id))
             return
-        msg = data.decode("utf8")
-        self.recv_msg_list.append(msg)
-        logging.debug("user:{} room:{} recv:{}".format(self.name, self.room, msg))
+        cb_func = self.proto_map[proto_id]
+        cb_func(proto)
+
+    def _register_proto(self):
+        self.proto_map = {
+            PROTO.C_SELECT_ROOM_REQ : self.cb_select_room, 
+            PROTO.C_SET_NAME_REQ : self.cb_set_name,
+        }
+
+    def cb_select_room(self, proto:dict) -> None:
+        pass
+
+    def cb_set_name(self, proto:dict) -> None:
+        pass
+
 
 class Room(object):
     """single chat room."""

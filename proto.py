@@ -13,6 +13,21 @@ ECODE = ECODE_DEF(
     room_not_exist  = 2
 )
 
+PROTO_DEF = namedtuple("PROTO_DEF",
+        """ S_ROOM_LIST_NOTIFY
+            C_SELECT_ROOM_REQ
+            S_SELECT_ROOM_RES
+            C_SET_NAME_REQ
+            S_SET_NAME_RES
+        """)
+PROTO = PROTO_DEF(
+    S_ROOM_LIST_NOTIFY  = 1,
+    C_SELECT_ROOM_REQ   = 2,
+    S_SELECT_ROOM_RES   = 3,
+    C_SET_NAME_REQ      = 4,
+    S_SET_NAME_RES      = 5,
+)
+
 
 ########### proto define #####################
 

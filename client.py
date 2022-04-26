@@ -1,20 +1,11 @@
 # from socket import *
 import os
-import sys
 import signal
-import time
 import socket
+import sys
+
+from common import get_host_ip
 from config import Config
-
-
-def get_host_ip():
-    try:
-        s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-        # s.connect(('8.8.8.8',80))
-        ip=s.getsockname()[0]
-    finally:
-        s.close()
-    return ip
 
 
 class Client(object):
