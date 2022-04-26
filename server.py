@@ -13,6 +13,8 @@ import selectors
 from threading import Thread
 from config import Config
 from common import get_str_time, tprint
+from network import NetPacketMgr
+
 
 class IdMgr(object):
     def __init__(self) -> None:
@@ -42,6 +44,7 @@ class Node():
         self.room_id = None # the room which node in
         self.recv_msg_list = []
         self.send_msg_list = []
+        self.net_packet_mgr = NetPacketMgr()
 
     def send(self, msg):
         """send message to client."""
