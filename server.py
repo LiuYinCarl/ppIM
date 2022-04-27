@@ -28,16 +28,16 @@ class IdMgr(object):
 
 class Node():
     """single user info."""
-    def __init__(self, node_id, socket, addr):
+    def __init__(self, node_id, cli_socket, addr):
         self.node_id = node_id
-        self.socket = socket
+        self.socket = cli_socket
         self.addr = addr
         self.close_flag = False
         self.proto_map = {}
 
         self.name = None # client user nick name
         self.room_id = None # the room which node in
-        self.net_packet_mgr = NetPacketMgr()
+        self.net_packet_mgr = NetPacketMgr(cli_socket)
 
         self._register_proto()
 
@@ -48,7 +48,7 @@ class Node():
     def recv(self):
         """receive message from client."""
         proto = self.net_packet_mgr.recv_proto()
-        return proto
+        self._dispatch(proto)
 
     def _dispatch(self, proto:dict) -> None:
         proto_id = proto["id"]
@@ -154,7 +154,7 @@ class RoomMgr(object):
 class Server(object):
     def __init__(self) -> None:
         self.conf = Config()
-        self.node_map = {} # k:v = cli_sock:Node
+        self.node_map = {} # k:v = cli_socket:Node
         self.room_mgr = RoomMgr()
         self.id_mgr = IdMgr()
         self.svr_socket = socket.socket()
@@ -197,12 +197,14 @@ class Server(object):
             self.sel.register(cli_sock, selectors.EVENT_READ, self.read_cli_msg)
             node_id = self.id_mgr.distribute_node_id()
             new_node = Node(node_id, cli_sock, cli_addr)
+            self.node_map[cli_sock] = new_node
             self.send_room_list_to_cli(new_node)
         except Exception as e:
             logging.error(e)
 
-    def read_cli_msg(self, cli_sock, mask):
-        node:Node = self.node_map(cli_sock)
+    def read_cli_msg(self, cli_sock:socket.socket, mask):
+        print(cli_sock)
+        node:Node = self.node_map[cli_sock]
         node.recv()
 
     def start(self):

@@ -14,7 +14,7 @@ MAX_PACK_SIZE = (1 << 16) - 1
 AES_SECRET_KEY = b"ufahdufhaiufugil"
 
 class NetPacketMgr(object):
-    def __init__(self, socket=None):
+    def __init__(self, socket):
         self.aes = AES.new(AES_SECRET_KEY, AES.MODE_ECB)
         self.socket = socket
         self.send_packet_list = []
