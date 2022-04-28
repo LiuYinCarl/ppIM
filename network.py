@@ -9,6 +9,8 @@ import unittest
 
 from Crypto.Cipher import AES
 
+logging.basicConfig(level=logging.DEBUG)
+
 PACKET_HEAD_LENGTH = 2
 MAX_PACK_SIZE = (1 << 16) - 1
 AES_SECRET_KEY = b"ufahdufhaiufugil"
@@ -51,7 +53,10 @@ class NetPacketMgr(object):
     
     def _pack(self, data:str):
         body = self._pack_body(data)
-        header = self._pack_header(len(body))
+        ok, header = self._pack_header(len(body))
+        if not ok:
+            logging.error("pack header failed.")
+            return
         packet = header + body
         return packet
 
@@ -61,7 +66,7 @@ class NetPacketMgr(object):
         while len(self.send_packet_list) > 0:
             # TODO check if socket send is success
             self.socket.send(self.send_packet_list[0])
-            self.send_packet_list.pop[0]
+            self.send_packet_list.pop(0)
 
     def _recv(self) -> str:
         data = self.socket.recv(1024)
@@ -76,14 +81,14 @@ class NetPacketMgr(object):
         body = self.recv_cache[PACKET_HEAD_LENGTH: packet_size]
         self.recv_cache = self.recv_cache[:packet_size] # remove first packet
         data = self._unpack_body(body)
-        logging.debug("rece: proto:{}".format(data))
         return data
 
     def send_proto(self, proto:dict) -> bool:
         if proto.get("id") is None:
             logging.error("proto lost id.")
             return False
-        data = json.dump(proto)
+        data = json.dumps(proto)
+        logging.debug("send proto: {}".format(data))
         self._send(data)
         return True
 
@@ -91,7 +96,9 @@ class NetPacketMgr(object):
         json_str = self._recv()
         if json_str is None:
             return None
-        return json.load(json_str)
+        logging.debug("recv proto: {}".format(json_str))
+        return json.loads(json_str)
+        
 
 
 

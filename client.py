@@ -1,5 +1,5 @@
 # from socket import *
-from asyncio.log import logger
+import logging
 import os
 import signal
 import socket
@@ -10,6 +10,7 @@ from config import Config
 from network import NetPacketMgr
 from proto import PROTO, ECODE
 
+logging.basicConfig(level=logging.DEBUG)
 
 class Client(object):
     def __init__(self):
@@ -17,12 +18,14 @@ class Client(object):
       self.sock = socket.socket()
       self.net_packet_mgr = NetPacketMgr(self.sock)
       self.proto_map = {}
+      self._regist_proto()
 
 
     def _dispatch(self, proto:dict) -> None:
         proto_id = proto["id"]
         if proto_id not in self.proto_map:
             logger.error("unknown proto_id({})".format(proto_id))
+            logger.error("proto_id: {}".format(self.proto_map.keys()))
             return
         cb_func = self.proto_map[proto_id]
         cb_func(proto)
@@ -58,12 +61,6 @@ class Client(object):
         }
         self.net_packet_mgr.send_proto(req)
 
-    def _send(self, msg):
-        self.sock.send(msg)
-
-    def _recv(self):
-        data = self.sock.recv(1024)
-        return data
 
     def msg_recv(self):
         while True:
@@ -90,26 +87,11 @@ class Client(object):
             self.sock.close()
             return
 
+        self.set_name_req("Jim")
+
         while True:
-            self._send("client({}) join.".format(self.local_ip))
-            data = self._recv()
-            msg = data.decode("utf8")
-            if msg == "ok":
-                print("enter im success.")
-                break
-            else:
-                print("enter im failed. err({})".format(msg))
-
-        signal.signal(signal.SIGCHLD, signal.SIG_IGN)
-        pid = os.fork()
-
-        if pid < 0:
-            sys.exit("err")
-        elif pid == 0:
-            self.msg_recv()
-        else:
-            print("main thread pid:{}".format(pid))
-            self.msg_send()
+            proto = self.net_packet_mgr.recv_proto()
+            self._dispatch(proto)
 
 
 if __name__ == '__main__':

@@ -10,6 +10,8 @@ from network import NetPacketMgr
 from proto import PROTO, ECODE
 from common import Singleton
 
+logging.basicConfig(level=logging.DEBUG)
+
 
 class IdMgr(object):
     def __init__(self) -> None:
@@ -69,7 +71,7 @@ class Node():
         pass
 
     def cb_set_name(self, proto:dict) -> None:
-        self.nick_name = proto["name"]
+        self.nick_name = proto["nick_name"]
         rsp = {
             "id": PROTO.S_SET_NAME_RES,
             "errcode": ECODE.success
@@ -175,11 +177,6 @@ class Server(object):
         self.wait_node_list = [] # users still not enter a room
         self.sel = selectors.DefaultSelector()
 
-    def send_room_list_to_cli(self, node:Node):
-        room_info = self.room_mgr.get_room_list()
-        node.send(room_info) # TODO room_info need to be string
-        self.wait_node_list.append(node)
-
     def deal_wait_node_list(self):
         need_delete_node = []
         for node in self.wait_node_list:
@@ -212,12 +209,10 @@ class Server(object):
             node_id = self.id_mgr.distribute_node_id()
             new_node = Node(node_id, cli_sock, cli_addr)
             self.node_map[cli_sock] = new_node
-            self.send_room_list_to_cli(new_node)
         except Exception as e:
             logging.error(e)
 
     def read_cli_msg(self, cli_sock:socket.socket, mask):
-        print(cli_sock)
         node:Node = self.node_map[cli_sock]
         node.recv()
 
@@ -229,6 +224,7 @@ class Server(object):
             for key, mask in events:
                 callback = key.data
                 callback(key.fileobj, mask)
+
 
 
 g_svr = Server()
