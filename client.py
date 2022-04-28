@@ -5,17 +5,16 @@ import signal
 import socket
 import sys
 
-from common import get_host_ip
+# from common import get_host_ip
 from config import Config
 from network import NetPacketMgr
-from proto import PROTO
+from proto import PROTO, ECODE
 
 
 class Client(object):
     def __init__(self):
       self.conf = Config()
       self.sock = socket.socket()
-      self.local_ip = get_host_ip()
       self.net_packet_mgr = NetPacketMgr(self.sock)
       self.proto_map = {}
 
@@ -42,13 +41,28 @@ class Client(object):
         pass
 
     def cb_set_name(self, proto:dict) -> None:
-        pass
+        errcode = proto["errcode"]
+        if errcode != ECODE.success:
+            logger.error("set name failed. errcode:{}".format(errcode))
+
+    def set_name_req(self, name:str) -> bool:
+        if not isinstance(name, str):
+            logger.error("name is not str.")
+            return False
+        if not name:
+            logger.warn("name is empty.")
+            return False
+        req = {
+            "id": PROTO.C_SET_NAME_REQ,
+            "nick_name": name,
+        }
+        self.net_packet_mgr.send_proto(req)
 
     def _send(self, msg):
         self.sock.send(msg)
 
     def _recv(self):
-        data = self.sockfd.recv(1024)
+        data = self.sock.recv(1024)
         return data
 
     def msg_recv(self):
@@ -70,10 +84,10 @@ class Client(object):
 
     def start(self):
         try:
-            self.sockfd.connect((self.conf.server_ip, self.conf.server_port))
+            self.sock.connect((self.conf.server_ip, self.conf.server_port))
         except Exception as e:
             print("conn to serer failed. err:{}".format(e))
-            self.sockfd.close()
+            self.sock.close()
             return
 
         while True:

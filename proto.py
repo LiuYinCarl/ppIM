@@ -5,12 +5,14 @@ from collections import namedtuple
 
 ECODE_DEF = namedtuple("ECODE_DEF", 
     """ success
+        illegal_nick_name
         room_not_exist
     """)
 
 ECODE = ECODE_DEF(
     success         = 1,
-    room_not_exist  = 2
+    illegal_nick_name = 2,
+    room_not_exist  = 3,
 )
 
 PROTO_DEF = namedtuple("PROTO_DEF",

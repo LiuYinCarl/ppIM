@@ -7,7 +7,8 @@ import socket
 import selectors
 from config import Config
 from network import NetPacketMgr
-from proto import PROTO
+from proto import PROTO, ECODE
+from common import Singleton
 
 
 class IdMgr(object):
@@ -24,7 +25,7 @@ class IdMgr(object):
         id = self._room_id
         self._room_id += 1
         return id
-    
+
 
 class Node():
     """single user info."""
@@ -35,7 +36,7 @@ class Node():
         self.close_flag = False
         self.proto_map = {}
 
-        self.name = None # client user nick name
+        self.nick_name = None # client user nick name
         self.room_id = None # the room which node in
         self.net_packet_mgr = NetPacketMgr(cli_socket)
 
@@ -68,7 +69,20 @@ class Node():
         pass
 
     def cb_set_name(self, proto:dict) -> None:
-        pass
+        self.nick_name = proto["name"]
+        rsp = {
+            "id": PROTO.S_SET_NAME_RES,
+            "errcode": ECODE.success
+        }
+        self.net_packet_mgr.send_proto(rsp)
+
+    def notify_room_list(self) -> bool:
+        rooms_info = g_svr.room_mgr.get_room_dict()
+        ntf = {
+            "id": PROTO.S_ROOM_LIST_NOTIFY,
+            "rooms_info": rooms_info,
+        }
+        self.net_packet_mgr.send_proto(ntf)
 
 
 class Room(object):
@@ -134,10 +148,10 @@ class RoomMgr(object):
         self._room_id += 1
         return id
 
-    def get_room_list(self):
-        info = []
+    def get_room_dict(self) -> dict:
+        info = {}
         for room_id, room in self.rooms:
-            info.append([room_id, room.nodes_num()])
+            info[room_id] = room.nodes_num()
         return info
 
     def node_join_room(self, room_id:int, node:Node) -> bool:
@@ -150,7 +164,7 @@ class RoomMgr(object):
         self.node_room_map[node.node_id] = room
         return True
 
-
+@Singleton
 class Server(object):
     def __init__(self) -> None:
         self.conf = Config()
@@ -217,6 +231,7 @@ class Server(object):
                 callback(key.fileobj, mask)
 
 
-if __name__ == "__main__":
-    svr = Server()
-    svr.start()
+g_svr = Server()
+g_svr.start()
+
+    

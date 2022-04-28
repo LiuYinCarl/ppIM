@@ -76,9 +76,13 @@ class NetPacketMgr(object):
         body = self.recv_cache[PACKET_HEAD_LENGTH: packet_size]
         self.recv_cache = self.recv_cache[:packet_size] # remove first packet
         data = self._unpack_body(body)
+        logging.debug("rece: proto:{}".format(data))
         return data
 
     def send_proto(self, proto:dict) -> bool:
+        if proto.get("id") is None:
+            logging.error("proto lost id.")
+            return False
         data = json.dump(proto)
         self._send(data)
         return True

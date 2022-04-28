@@ -11,10 +11,13 @@ def tprint(s):
     print("{} {}".format(t, s))
 
 
-def get_host_ip():
-    try:
-        s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-        ip = s.getsockname()[0]
-    finally:
-        s.close()
-    return ip
+def Singleton(cls):
+    """simple and not multi-thread safe singleton."""
+    _instance = {}
+
+    def _singleton(*args, **kargs):
+        if cls not in _instance:
+            _instance[cls] = cls(*args, **kargs)
+        return _instance[cls]
+
+    return _singleton
