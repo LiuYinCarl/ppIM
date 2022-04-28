@@ -8,7 +8,7 @@ import selectors
 from config import Config
 from network import NetPacketMgr
 from proto import PROTO, ECODE
-from common import Singleton
+from common import Singleton, get_str_time
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -65,10 +65,20 @@ class Node():
         self.proto_map = {
             PROTO.C_SELECT_ROOM_REQ : self.cb_select_room, 
             PROTO.C_SET_NAME_REQ : self.cb_set_name,
+            PROTO.C_SEND_MSG_REQ: self.cb_msg_req,
         }
 
     def cb_select_room(self, proto:dict) -> None:
-        pass
+        room_id = proto["room_id"]
+        ok = g_svr.room_mgr.node_join_room(room_id, self)
+        if ok:
+            self.room_id = room_id
+
+        rsp = {
+            "id": PROTO.S_SELECT_ROOM_RES,
+            "errcode": ECODE.success if ok else ECODE.join_room_failed,
+        }
+        self.net_packet_mgr.send_proto(rsp)
 
     def cb_set_name(self, proto:dict) -> None:
         self.nick_name = proto["nick_name"]
@@ -77,6 +87,13 @@ class Node():
             "errcode": ECODE.success
         }
         self.net_packet_mgr.send_proto(rsp)
+        
+        self.notify_room_list()
+
+    def cb_msg_req(self, proto:dict) -> None:
+        msg = "{} {}: {}".format(get_str_time(), self.nick_name, proto["msg"])
+        room:Room = g_svr.room_mgr.get_room_by_id(self.room_id)
+        room.broadcast_msg(msg)
 
     def notify_room_list(self) -> bool:
         rooms_info = g_svr.room_mgr.get_room_dict()
@@ -85,49 +102,62 @@ class Node():
             "rooms_info": rooms_info,
         }
         self.net_packet_mgr.send_proto(ntf)
+    
+    def notify_msg(self, msg:str) -> bool:
+        ntf = {
+            "id": PROTO.S_MSG_NOTIFY,
+            "msg": msg,
+        }
+        self.net_packet_mgr.send_proto(ntf)
 
 
 class Room(object):
     """single chat room."""
     def __init__(self, id):
         self.room_id = id
-        self.nodes = {}
+        self.nodes = {} # node_id:Node
 
     def uninit(self):
         # TODO send server down to all node.
         logging.info("room({}) destroy.".format(self.room_id))
 
-    def deal_join(self, node):
+    def deal_join(self, node:Node) -> bool:
         """manager user join room."""
-        pass
+        self.nodes[node.node_id] = node
 
-    def deal_leave(self):
+    def deal_leave(self, node:Node) -> bool:
         """manager user leave room."""
-    
-    def recv(self):
-        """room reveive message come from user."""
-        pass
-
-    def send(self):
-        """room send message to all."""
-        pass
+        self.nodes.pop(node.node_id)
 
     def update(self):
         """update the room."""
         pass
 
+    def is_node_in_room(self, node_id:int) -> bool:
+        return node_id in self.nodes
+
     def nodes_num(self):
         return len(self.nodes)
+
+    def broadcast_msg(self, msg:str) -> bool:
+        for node in self.nodes.values():
+            node.notify_msg(msg)
+        return True
 
 class RoomMgr(object):
     """room manager."""
     def __init__(self) -> None:
-        self._room_id = 0
-        self.rooms = {}
+        self.rooms = {} # room_id:room
         self.node_room_map = {}
 
+        self.create_default_room()
+
+    def create_default_room(self):
+        for _ in range(5):
+            self.create_room()
+
     def create_room(self):
-        id = self.distribute_room_id()
+        id = g_id_mgr.distribute_room_id()
         if id in self.rooms:
             logging.error("duplicated room id")
             return
@@ -145,26 +175,27 @@ class RoomMgr(object):
         for room in self.rooms.items():
             room.update()
 
-    def distribute_room_id(self):
-        id = self._room_id
-        self._room_id += 1
-        return id
-
     def get_room_dict(self) -> dict:
         info = {}
-        for room_id, room in self.rooms:
+        for room_id, room in self.rooms.items():
             info[room_id] = room.nodes_num()
         return info
+
+    def get_room_by_id(self, room_id:int) -> Room:
+        if room_id not in self.rooms:
+            logging.error("room({}) not exist".format(room_id))
+            return None
+        return self.rooms[room_id]
 
     def node_join_room(self, room_id:int, node:Node) -> bool:
         if room_id not in self.rooms:
             return False
         room:Room = self.rooms[room_id]
-        ok = room.deal_join(node)
-        if not ok:
-            return False
-        self.node_room_map[node.node_id] = room
-        return True
+        if not room.is_node_in_room(node.node_id):
+            room.deal_join(node)
+            self.node_room_map[node.node_id] = room
+            return True
+        return False
 
 @Singleton
 class Server(object):
@@ -172,25 +203,10 @@ class Server(object):
         self.conf = Config()
         self.node_map = {} # k:v = cli_socket:Node
         self.room_mgr = RoomMgr()
-        self.id_mgr = IdMgr()
+        # self.id_mgr = IdMgr()
         self.svr_socket = socket.socket()
         self.wait_node_list = [] # users still not enter a room
         self.sel = selectors.DefaultSelector()
-
-    def deal_wait_node_list(self):
-        need_delete_node = []
-        for node in self.wait_node_list:
-            msg = node.recv()
-            # at there, we only accept select room cmd
-            if "select_room" not in msg:
-                logging.error("error message. only accept select room cmd.")
-                continue
-            except_room_id = int(msg.split(" ")[-1])
-            ok = self.room_mgr.node_join_room(except_room_id, node)
-            if ok == True:
-                need_delete_node.append(node)
-        for node in need_delete_node:
-            self.wait_node_list.remove(node)
 
     def init_svr_socket(self):
         self.svr_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -206,7 +222,7 @@ class Server(object):
             cli_sock, cli_addr = self.svr_socket.accept()
             cli_sock.setblocking(False)
             self.sel.register(cli_sock, selectors.EVENT_READ, self.read_cli_msg)
-            node_id = self.id_mgr.distribute_node_id()
+            node_id = g_id_mgr.distribute_node_id()
             new_node = Node(node_id, cli_sock, cli_addr)
             self.node_map[cli_sock] = new_node
         except Exception as e:
@@ -226,6 +242,7 @@ class Server(object):
                 callback(key.fileobj, mask)
 
 
+g_id_mgr = IdMgr()
 
 g_svr = Server()
 g_svr.start()

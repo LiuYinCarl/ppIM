@@ -9,7 +9,7 @@ import unittest
 
 from Crypto.Cipher import AES
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 
 PACKET_HEAD_LENGTH = 2
 MAX_PACK_SIZE = (1 << 16) - 1
@@ -19,7 +19,6 @@ class NetPacketMgr(object):
     def __init__(self, socket):
         self.aes = AES.new(AES_SECRET_KEY, AES.MODE_ECB)
         self.socket = socket
-        self.send_packet_list = []
         self.recv_packet_list = []
         self.recv_cache = bytes()
 
@@ -57,16 +56,12 @@ class NetPacketMgr(object):
         if not ok:
             logging.error("pack header failed.")
             return
-        packet = header + body
+        packet:bytes = header + body
         return packet
 
     def _send(self, data:str) -> bool:
         packet = self._pack(data)
-        self.send_packet_list.append(packet)
-        while len(self.send_packet_list) > 0:
-            # TODO check if socket send is success
-            self.socket.send(self.send_packet_list[0])
-            self.send_packet_list.pop(0)
+        self.socket.send(packet)
 
     def _recv(self) -> str:
         data = self.socket.recv(1024)
@@ -79,9 +74,9 @@ class NetPacketMgr(object):
             return None # still not receive a full packet
         packet_size = PACKET_HEAD_LENGTH + body_len
         body = self.recv_cache[PACKET_HEAD_LENGTH: packet_size]
-        self.recv_cache = self.recv_cache[:packet_size] # remove first packet
-        data = self._unpack_body(body)
-        return data
+        self.recv_cache = self.recv_cache[packet_size:] # remove first packet
+        str_data = self._unpack_body(body)
+        return str_data
 
     def send_proto(self, proto:dict) -> bool:
         if proto.get("id") is None:
